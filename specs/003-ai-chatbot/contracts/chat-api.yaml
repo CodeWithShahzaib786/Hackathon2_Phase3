@@ -1,0 +1,254 @@
+openapi: 3.0.0
+info:
+  title: Todo Chatbot API
+  description: Chat interface for natural language task management
+  version: 1.0.0
+  contact:
+    name: Phase III - AI-Powered Todo Chatbot
+
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+  - url: https://api.example.com
+    description: Production server
+
+security:
+  - BearerAuth: []
+
+paths:
+  /api/chat:
+    post:
+      summary: Send chat message
+      description: Send a message to the chatbot and receive a response. Creates a new session if session_id is not provided.
+      operationId: sendChatMessage
+      tags:
+        - Chat
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatRequest'
+            examples:
+              newSession:
+                summary: New conversation
+                value:
+                  message: "Add a task to buy groceries"
+                  session_id: null
+              existingSession:
+                summary: Continue conversation
+                value:
+                  message: "Mark the first one as complete"
+                  session_id: "550e8400-e29b-41d4-a716-446655440000"
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatResponse'
+              examples:
+                taskCreated:
+                  summary: Task created successfully
+                  value:
+                    message: "I've created a task: Buy groceries"
+                    session_id: "550e8400-e29b-41d4-a716-446655440000"
+                    tool_calls:
+                      - tool_name: "create_task"
+                        arguments:
+                          title: "Buy groceries"
+                        result:
+                          id: "770e8400-e29b-41d4-a716-446655440002"
+                          title: "Buy groceries"
+                          completed: false
+                    timestamp: "2026-02-17T10:30:15Z"
+        '400':
+          description: Bad request (invalid input)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized (missing or invalid JWT token)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too many requests (rate limit exceeded)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/chat/session/{session_id}:
+    delete:
+      summary: Clear conversation context
+      description: Delete a chat session and clear its conversation history
+      operationId: clearChatSession
+      tags:
+        - Chat
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          description: Session ID to clear
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Session cleared successfully
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden (session belongs to another user)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token from Phase II authentication
+
+  schemas:
+    ChatRequest:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+          description: User's message text
+          minLength: 1
+          maxLength: 1000
+          example: "Add a task to buy groceries"
+        session_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Existing session ID (null for new session)
+          example: "550e8400-e29b-41d4-a716-446655440000"
+
+    ChatResponse:
+      type: object
+      required:
+        - message
+        - session_id
+        - timestamp
+      properties:
+        message:
+          type: string
+          description: Assistant's response text
+          example: "I've created a task: Buy groceries"
+        session_id:
+          type: string
+          format: uuid
+          description: Session identifier
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        tool_calls:
+          type: array
+          description: Tools that were called (if any)
+          items:
+            $ref: '#/components/schemas/ToolCall'
+        timestamp:
+          type: string
+          format: date-time
+          description: Response timestamp
+          example: "2026-02-17T10:30:15Z"
+
+    ToolCall:
+      type: object
+      required:
+        - tool_name
+        - arguments
+      properties:
+        tool_name:
+          type: string
+          description: Name of the tool that was called
+          example: "create_task"
+        arguments:
+          type: object
+          description: Tool parameters
+          example:
+            title: "Buy groceries"
+            description: "Milk, eggs, bread"
+        result:
+          type: object
+          nullable: true
+          description: Tool execution result
+          example:
+            id: "770e8400-e29b-41d4-a716-446655440002"
+            title: "Buy groceries"
+            completed: false
+        error:
+          type: string
+          nullable: true
+          description: Error message if tool failed
+          example: null
+
+    ErrorResponse:
+      type: object
+      required:
+        - detail
+      properties:
+        detail:
+          type: string
+          description: Error message
+          example: "Message cannot be empty"
+
+  examples:
+    CreateTaskCommand:
+      summary: Create task command
+      value:
+        message: "Add a task to buy groceries"
+        session_id: null
+
+    ListTasksCommand:
+      summary: List tasks command
+      value:
+        message: "Show me all my tasks"
+        session_id: "550e8400-e29b-41d4-a716-446655440000"
+
+    UpdateTaskCommand:
+      summary: Update task command
+      value:
+        message: "Change my first task to say meeting at 3pm"
+        session_id: "550e8400-e29b-41d4-a716-446655440000"
+
+    DeleteTaskCommand:
+      summary: Delete task command
+      value:
+        message: "Delete all completed tasks"
+        session_id: "550e8400-e29b-41d4-a716-446655440000"
+
+    MarkCompleteCommand:
+      summary: Mark complete command
+      value:
+        message: "Mark my first task as done"
+        session_id: "550e8400-e29b-41d4-a716-446655440000"
