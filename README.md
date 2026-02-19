@@ -9,8 +9,6 @@ Phase III adds a conversational AI interface to the existing Phase II todo appli
 ### Key Achievement
 **We successfully integrated OpenAI GPT-4-turbo with custom MCP (Model Context Protocol) tools to create a fully functional AI-powered task management assistant.**
 
----
-
 ## 🚀 Features Implemented
 
 ### 1. Conversational Task Management
